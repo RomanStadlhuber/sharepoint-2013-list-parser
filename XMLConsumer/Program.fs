@@ -93,21 +93,10 @@ let parseXMLSchema (inDir:string)(outDir:string) =
 
     | None -> ()
 
-
-let readcommands =
-
-    let path = "D:\\Work\\MOGI\\04_Projects\\RTATV\\Parser\\Input\\Test001.yaml"
-
-    path |> readCommandList
-
 [<EntryPoint>]
 let main argv =
 
-    //readcommands
-
-    test
-
-    (*let files = "D:\\Projects\\Talend\\SP13 Parser Data\\Testing\\filelist2.txt" |> getFiles
+    let files = "D:\\Projects\\Talend\\SP13 Parser Data\\Testing\\filelist2.txt" |> getFiles
 
     for f in files do
         
@@ -116,7 +105,6 @@ let main argv =
         parseXMLSchema _i _o
 
         ()
-    *)
 
     
     0 // return an integer exit code

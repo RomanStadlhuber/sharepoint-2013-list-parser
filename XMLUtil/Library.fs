@@ -165,11 +165,50 @@ module Parsing =
 
         let mutable rows: PureRow list = []
 
+       
+        let buildSchemaRepresentation schema =
+
+            (*
+                This function assumes that the entered schema already only contains
+                the needed attributes where the local name is 
+                "Attributetype" or "datatype"
+            *)
+
+
+            let buildRow (row:ImpureRow) (attr:XElement):ImpureRow =
+                match attr.Name.LocalName with
+                | "AttributeType" -> 
+                    {Name = Some(attr); Type = None} //on AttrybuteType a new row is created
+                | "datatype" -> 
+                   {row with Type = Some attr} //on datatype the accumulator is updated
+                | _ -> row //this case would not happen
+
+            //scan is used because the intermediate accumulations are needed
+            let unvalidatedBuild = Seq.scan buildRow {Name = None; Type = None} schema
+
+
+            //this filters the intermediate accumulations for the used rows where
+            let validateSchemaRepresentation schema =
+                let Validation (row:ImpureRow) =
+                     match row with
+                     | {Name = Some(x); Type = Some(y)} -> true
+                     | _ -> false
+
+                Seq.filter Validation schema
+
+            validateSchemaRepresentation unvalidatedBuild
+
+
         schema |> Seq.iter(
 
             let mutable currRow:ImpureRow = {Name = None; Type = None}
 
             fun sch -> 
+
+                let schemaBuild = buildSchemaRepresentation (sch|>attributeTypes)
+
+                List.ofSeq schemaBuild |> printfn "%A"
+
                 sch |> attributeTypes |> Seq.iter(
                     fun attr ->
 
