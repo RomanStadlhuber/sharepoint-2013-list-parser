@@ -2,7 +2,6 @@
 
 open System
 open System.IO
-open System.Text
 open XMLUtil.Parsing
 open XMLUtil.Converting
 open XMLUtil.Commands
@@ -37,20 +36,11 @@ let parseXMLSchema (inDir:string)(outDir:string) =
 
     let root = inDir |> getRoot
 
-    let getRows root = 
-        root |> Option.map readSchema
-    
-    let printRows rows = 
-        match rows with
-            | Some(rs) -> rs |> Seq.iter(fun x -> x |> printfn "%A")
-            | _ -> ()
-        ()
-
-    let rows = root |> getRows
+    let rows = root |> Option.map (fun x -> x|> readSchema)
 
     //try to convert rows to marshalled row data if they exist
 
-    //create the XElemeent row field predicates
+    //create the XElement row field predicates
     let predXName = {Namespace = "urn:schemas-microsoft-com:rowset"; LocalName = "name"}
     let predXType = {Namespace = "uuid:C2F41010-65B3-11d1-A29F-00AA00C14882"; LocalName = "type"}
 
@@ -58,6 +48,7 @@ let parseXMLSchema (inDir:string)(outDir:string) =
     let predsMName= [
         {Target = ":"; Replacing = "_"}
         {Target = "ü"; Replacing = "ue"}
+        {Target = "ä"; Replacing = "ae"}
         {Target = " "; Replacing = "_"}
     ]
 
@@ -69,8 +60,6 @@ let parseXMLSchema (inDir:string)(outDir:string) =
         {Target = "boolean"; Replacing = "id_String"} //id_Boolean
         {Target = "variant";Replacing = "id_String"}
         {Target = "String"; Replacing = "id_String"}
-
-
     ]
 
     match rows with
@@ -96,7 +85,9 @@ let parseXMLSchema (inDir:string)(outDir:string) =
 [<EntryPoint>]
 let main argv =
 
-    let files = "D:\\Projects\\Talend\\SP13 Parser Data\\Testing\\filelist2.txt" |> getFiles
+    //the commands (input and output directories, later on also string replacements)
+    //are read from a commandList text file
+    let files = "D:\Work\MOGI\04_Projects\RTATV\Parser\Input\commandList.txt" |> getFiles
 
     for f in files do
         

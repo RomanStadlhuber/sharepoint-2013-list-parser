@@ -141,7 +141,7 @@ module Parsing =
         
     let readSchema (root:XElement) =
 
-
+        //query used to get the schema
         let schema = 
             query{
                 for desc in root.Descendants() do
@@ -149,12 +149,14 @@ module Parsing =
                         then select desc
             }
 
+        //predicate used to identify needed schema elements
         let isRowInfo (element:XElement) =
             match element.Name.LocalName with
             | "AttributeType" -> true
             | "datatype" -> true
             | _ -> false
 
+        //query used to get the needed fields that are attribute types
         let attributeTypes (schema:XElement) =
                 query{
                     for desc in schema.Descendants() do
@@ -162,9 +164,6 @@ module Parsing =
                             then select desc
 
                 }
-
-        let mutable rows: PureRow list = []
-
        
         let buildSchemaRepresentation schema =
 
@@ -199,34 +198,18 @@ module Parsing =
             validateSchemaRepresentation unvalidatedBuild
 
 
-        schema |> Seq.iter(
-
-            let mutable currRow:ImpureRow = {Name = None; Type = None}
+        let pureRows = schema |> Seq.map(
 
             fun sch -> 
 
                 let schemaBuild = buildSchemaRepresentation (sch|>attributeTypes)
 
-                List.ofSeq schemaBuild |> printfn "%A"
+                let extractedInfo = schemaBuild |> Seq.map extract
 
-                sch |> attributeTypes |> Seq.iter(
-                    fun attr ->
-
-                        match attr.Name.LocalName with
-                        | "AttributeType" -> (currRow <- {Name = Some attr; Type=None}) |> ignore
-                        | "datatype" -> currRow<-{currRow with Type = Some attr} //currRow.Type <- Some attr
-                        | _ -> ()
-
-                        let extr = currRow |> extract
-
-                        match extr with
-                        | Some(r) -> rows <- List.append rows [r]
-                        | None -> ()
-                    
-                )
+                extractedInfo |> Seq.choose id
         )
-        rows
 
+        pureRows |> Seq.fold (fun acc x -> Seq.append x acc) Seq.empty
 
     //converts a single pure row to a row data marshalled object
     let private convertToMarshalled (row:PureRow) (matchesName: XAttribute -> bool, matchesType: XAttribute -> bool) =
@@ -261,9 +244,9 @@ module Parsing =
 
     //converts a list of rows to a list of marshalled row objects
     //no filters are applied to the marshalled row's fields
-    let getRowInfos (rows:PureRow list)(namePredicate: XNamePredicate, typePredicate:XNamePredicate) =
+    let getRowInfos (rows:seq<PureRow>)(namePredicate: XNamePredicate, typePredicate:XNamePredicate) =
 
-        let mutable marshalled: MarshalRow list = []
+        //let mutable marshalled: MarshalRow list = []
 
         let createMatcher (pred:XNamePredicate) =
 
@@ -281,14 +264,10 @@ module Parsing =
                 isMatch
 
 
-        rows |> Seq.iter(
-            fun r ->
-                
+        let marshalled = rows |> Seq.map(fun r ->
                 //perform a conversion from pure row data to marshalled row data
                 //this is done by passing in predicates both for the name and for the type field of a row
-                let m = convertToMarshalled r ((namePredicate |> createMatcher), (typePredicate |> createMatcher))
-
-                marshalled <- m::marshalled
+                convertToMarshalled r ((namePredicate |> createMatcher), (typePredicate |> createMatcher))
         )
 
         marshalled
@@ -305,7 +284,7 @@ module Parsing =
 
         {MarshalRow.Name = rn; MarshalRow.Type = rt}
 
-    let replaceRowData (rows:MarshalRow list)(predsName:NamePredicate list, predsType:NamePredicate list) =
+    let replaceRowData (rows:seq<MarshalRow>)(predsName:NamePredicate list, predsType:NamePredicate list) =
         
         let mutable replaced:MarshalRow list = []
 
@@ -314,6 +293,8 @@ module Parsing =
 
                 let mutable curr = r
                 
+                //ISSUE -> in order to replace types, names need to exist
+                //TODO: remove dependency in this for loop. Moreover - how to remove mutable
                 for pn in predsName do
                     for pt in predsType do
                         curr <- replaceSequences curr (pn,pt)
@@ -544,7 +525,7 @@ module Commands =
 
     type FileTask = {
         InputTarget: DirectoryInfo
-        OutputTarger: DirectoryInfo
+        OutputTarget: DirectoryInfo
     }
 
     type SemanticTask = {
@@ -556,3 +537,37 @@ module Commands =
         Files: FileTask list
         Semantics: SemanticTask list
     }
+
+    type LexicalResult =
+    | FileTask of FileTask
+    | SemanticTask of SemanticTask
+
+    //how parsing would work:
+
+    (*
+        read line by line
+        line options can be     
+            -> declaring file tasks
+            -> declaring semantic tasks
+            -> declating comments
+            -> containing File- or SemanticTask string data, comments
+            -> empty
+        
+        the lexical results are parsed into the correspoding operation
+        type that was declared by a preceding declaration line
+        
+        string content needs to be clipped to start and end at the first
+        and last non-empty character. example:
+
+        "  test  " would become "test"
+
+        the list of file and semantic tasks need to be converted into
+        arguments for the corresponding handling functions
+        
+        functions need
+            -> either path arguments (from, to)
+            -> or semantic replacement argumentss
+
+        //TODO: see fixing the ISSUE where semantic replacer needs name
+        aruments in order to create type arguments
+    *)
